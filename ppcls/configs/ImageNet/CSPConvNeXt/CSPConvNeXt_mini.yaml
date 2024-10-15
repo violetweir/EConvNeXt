@@ -2,7 +2,7 @@
 Global:
   checkpoints: null
   pretrained_model: null
-  output_dir: ./output/
+  output_dir: ./output/CSPConvNeXt_mini
   device: gpu
   save_interval: 30
   eval_during_train: True
