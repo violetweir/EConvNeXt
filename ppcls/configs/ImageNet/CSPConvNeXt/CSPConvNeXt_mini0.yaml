@@ -18,7 +18,7 @@ Global:
 
 # model architecture
 Arch:
-  name: CSPConvNeXt_tiny
+  name: CSPConvNeXt_mini0
   class_num: 1000
 
  
