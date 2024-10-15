@@ -181,17 +181,17 @@ class CSPConvNext(nn.Layer):
         self,
         class_num=1000,
         in_chans=3,
-        depths=[3, 3, 27, 3],
-        dims=[64,128,256,512,1024],
-        kernel_size=7,
+        depths=[1, 2, 8, 2],
+        dims=[32, 64, 128, 256, 512],
+        kernel_size=[3,3,5,3],
         if_group=1,
         drop_path_rate=0.2,
         layer_scale_init_value=1e-6,
-        stride=[2,2,2,2],
+        stride=[1,2,2,2],
         return_idx=[1,2,3],
         depth_mult = 1.0,
         width_mult = 1.0,
-        stem = "vb"
+        stem = "va"
     ):
         super().__init__()
         block_former = [Block,Block,Block,Block]
@@ -223,7 +223,7 @@ class CSPConvNext(nn.Layer):
             depths[i], 
             stride[i],
             dp_rates[sum(depths[:i]) : sum(depths[:i+1])],
-            kernel_size=kernel_size,
+            kernel_size=kernel_size[i],
             if_group=if_group,
             act=nn.GELU))
                                       for i in range(n)])
@@ -267,13 +267,13 @@ def _load_pretrained(pretrained, model, model_url, use_ssld=False):
         )
 
 
-def CSPConvNeXt_small(pretrained=False, use_ssld=False, **kwargs):
+def CSPConvNeXt_mini_0(pretrained=False, use_ssld=False, **kwargs):
     model = CSPConvNext(**kwargs)
     _load_pretrained(
         pretrained, model, MODEL_URLS["ConvNeXt_tiny"], use_ssld=use_ssld)
     return model
 
 if __name__=="__main__":
-     model  = CSPConvNeXt_small()
+     model  = CSPConvNeXt_mini_0()
      # Total Flops: 1189500624     Total Params: 8688640
      paddle.flops(model,(1,3,224,224),print_detail=True)

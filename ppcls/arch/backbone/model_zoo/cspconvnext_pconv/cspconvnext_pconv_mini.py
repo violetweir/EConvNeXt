@@ -3,7 +3,7 @@ import paddle.nn as nn
 from paddle import ParamAttr
 from paddle.nn.initializer import TruncatedNormal, Constant
 
-#from .....utils.save_load import load_dygraph_pretrain
+from .....utils.save_load import load_dygraph_pretrain
 
 
 MODEL_URLS = {
@@ -51,19 +51,45 @@ class EffectiveSELayer(nn.Layer):
         x_se = x.mean((2, 3), keepdim=True)
         x_se = self.fc(x_se)
         return x * self.act(x_se)
+
+class Partial_conv3(nn.Layer):
+
+    def __init__(self, dim, n_div, forward):
+        super().__init__()
+        self.dim_conv3 = dim // n_div
+        self.dim_untouched = dim - self.dim_conv3
+        self.partial_conv3 = nn.Conv2D(self.dim_conv3, self.dim_conv3, 3, 1, 1)
+
+        if forward == 'slicing':
+            self.forward = self.forward_slicing
+        elif forward == 'split_cat':
+            self.forward = self.forward_split_cat
+        else:
+            raise NotImplementedError
+
+    def forward_slicing(self,x):
+        # only for inference
+        x = x.clone()   # !!! Keep the original input intact for the residual connection later
+        x[:, :self.dim_conv3, :, :] = self.partial_conv3(x[:, :self.dim_conv3, :, :])
+
+        return x
+
+    def forward_split_cat(self,x):
+        # for training/inference
+        x1, x2 = paddle.split(x, [self.dim_conv3, self.dim_untouched], axis=1)
+        x1 = self.partial_conv3(x1)
+        x = paddle.concat((x1, x2), 1)
+
+        return x
     
 class Block(nn.Layer):
-    def __init__(self, dim, kernel_size=7, if_gourp=1, drop_path=0., layer_scale_init_value=1e-6):
+    def __init__(self, dim, kernel_size=7, if_gourp=1, forward="split_cat", drop_path=0., layer_scale_init_value=1e-6):
         super().__init__()
         if if_gourp == 1:
             groups = dim
         else:
             groups = 1
-        self.dwconv = nn.Conv2D(dim, 
-                                dim, 
-                                kernel_size=kernel_size, 
-                                padding=kernel_size//2,
-                                groups=groups)
+        self.dwconv = Partial_conv3(dim, 4, forward)
         self.norm = nn.BatchNorm2D(dim)
         self.pwconv1 = nn.Conv2D(dim, 
                                  4 * dim, 
@@ -144,7 +170,8 @@ class CSPStage(nn.Layer):
                 if_group=1,
                 layer_scale_init_value=1e-6,
                 act=nn.GELU,
-                attn='eca',):
+                attn='eca',
+                forward='split_cat'):
         super().__init__()
         ch_mid = (ch_in+ch_out)//2
         if stride == 2:
@@ -155,7 +182,7 @@ class CSPStage(nn.Layer):
         self.conv2 = ConvBNLayer(ch_mid, ch_mid // 2, 1, act=act)
         self.blocks = nn.Sequential(*[
             block_fn(
-                ch_mid // 2,kernel_size, if_group,drop_path=p_rates[i],layer_scale_init_value=layer_scale_init_value)
+                ch_mid // 2,kernel_size, if_group, forward=forward,drop_path=p_rates[i],layer_scale_init_value=layer_scale_init_value)
             for i in range(n)
         ])
         if attn:
@@ -176,13 +203,14 @@ class CSPStage(nn.Layer):
         y = self.conv3(y)
         return y
 
-class CSPConvNext(nn.Layer):
+class CSPConvNext_Pconv(nn.Layer):
     def __init__(
         self,
         class_num=1000,
         in_chans=3,
-        depths=[3, 3, 27, 3],
-        dims=[64,128,256,512,1024],
+        forward="split_cat",
+        depths=[3, 3, 9, 3],
+        dims=[48,96,192,384,768],
         kernel_size=7,
         if_group=1,
         drop_path_rate=0.2,
@@ -225,7 +253,8 @@ class CSPConvNext(nn.Layer):
             dp_rates[sum(depths[:i]) : sum(depths[:i+1])],
             kernel_size=kernel_size,
             if_group=if_group,
-            act=nn.GELU))
+            act=nn.GELU,
+            forward=forward))
                                       for i in range(n)])
 
         self.norm = nn.LayerNorm(dims[-1], epsilon=1e-6)  # final norm layer
@@ -267,13 +296,13 @@ def _load_pretrained(pretrained, model, model_url, use_ssld=False):
         )
 
 
-def CSPConvNeXt_small(pretrained=False, use_ssld=False, **kwargs):
-    model = CSPConvNext(**kwargs)
+def CSPConvNeXt_pconv_mini(pretrained=False, use_ssld=False, **kwargs):
+    model = CSPConvNext_Pconv(**kwargs)
     _load_pretrained(
         pretrained, model, MODEL_URLS["ConvNeXt_tiny"], use_ssld=use_ssld)
     return model
 
 if __name__=="__main__":
-     model  = CSPConvNeXt_small()
+     model  = CSPConvNeXt_pconv_mini()
      # Total Flops: 1189500624     Total Params: 8688640
      paddle.flops(model,(1,3,224,224),print_detail=True)

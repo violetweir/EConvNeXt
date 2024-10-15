@@ -86,6 +86,9 @@ from .model_zoo.svtrnet import SVTR_tiny, SVTR_base, SVTR_large
 from .model_zoo.cspconvnext.cspconvnext_mini import CSPConvNeXt_mini
 from .model_zoo.cspconvnext.cspconvnext_tiny import CSPConvNeXt_tiny
 from .model_zoo.cspconvnext.cspconvnext_small import CSPConvNeXt_small
+from .model_zoo.cspconvnext.cspconvnext_mini_0 import CSPConvNeXt_mini_0
+from .model_zoo.cspconvnext_pconv.cspconvnext_pconv_mini import CSPConvNeXt_pconv_mini
+from .model_zoo.cspconvnext_pconv.cspconvnext_pconv_tiny import CSPConvNeXt_pconv_tiny
 
 from .variant_models.resnet_variant import ResNet50_last_stage_stride1
 from .variant_models.resnet_variant import ResNet50_adaptive_max_pool2d
