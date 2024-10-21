@@ -45,7 +45,7 @@ class EffectiveSELayer(nn.Layer):
     def __init__(self, channels, act='hardsigmoid'):
         super(EffectiveSELayer, self).__init__()
         self.fc = nn.Conv2D(channels, channels, kernel_size=1, padding=0)
-        self.act = nn.Hardsigmoid()
+        self.act = nn.GELU()
 
     def forward(self, x):
         x_se = x.mean((2, 3), keepdim=True)
@@ -228,10 +228,11 @@ class CSPConvNext(nn.Layer):
             act=nn.GELU))
                                       for i in range(n)])
 
-        self.norm = nn.LayerNorm(dims[-1], epsilon=1e-6)  # final norm layer
-        self.head = nn.Linear(dims[-1], class_num)
-
         self.apply(self._init_weights)
+
+
+        self.norm = nn.BatchNorm(dims[-1], epsilon=1e-6)  # final norm layer
+        self.head = nn.Linear(dims[-1], class_num)
 
     def _init_weights(self, m):
         if isinstance(m, (nn.Conv2D, nn.Linear)):
